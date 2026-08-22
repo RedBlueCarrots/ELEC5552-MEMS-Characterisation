@@ -30,9 +30,9 @@
 //#define TFT_MISO PB14
 //#define TFT_SCLK PB13
 
-#define TFT_CS   PC15 // Nucleo-F767ZI equivalent of D5
-#define TFT_DC   PC14  // Nucleo-F767ZI equivalent of D6
-#define TFT_RST  PC13 // Nucleo-F767ZI equivalent of D7
+#define TFT_CS   PC15
+#define TFT_DC   PC14
+#define TFT_RST  PC13
 
 //#define TFT_RST  -1   // Set TFT_RST to -1 if the display RESET is connected to processor reset
                         // Use an Arduino pin for initial testing as connecting to processor reset
