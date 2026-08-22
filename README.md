@@ -1,0 +1,15 @@
+# BLACKPILL SETUP
+
+* LCD_DC -> PC14
+* LCD_CS -> PC15
+
+* CLK -> PA5
+* MOSI -> PA7
+* MISO -> PA6
+
+* LCD_RST -> PC13
+
+* VSYS -> 5V
+* GND -> GND
+
+* TP_CS -> PA0
