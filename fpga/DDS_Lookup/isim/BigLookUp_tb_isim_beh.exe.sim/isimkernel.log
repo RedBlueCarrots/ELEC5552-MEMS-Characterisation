@@ -1,0 +1,29 @@
+Command line:
+   BigLookUp_tb_isim_beh.exe
+     -simmode  gui
+     -simrunnum  1
+     -socket  41135
+
+Sun Sep  6 18:41:36 2026
+
+
+ Elaboration Time: 0.03 sec
+
+ Current Memory Usage: 208.253 Meg
+
+ Total Signals          : 239
+ Total Nets             : 33462
+ Total Signal Drivers   : 84
+ Total Blocks           : 20
+ Total Primitive Blocks : 11
+ Total Processes        : 52
+ Total Traceable Variables  : 232
+ Total Scalar Nets and Variables : 34990
+Total Line Count : 430
+
+ Total Simulation Time: 30.49 sec
+
+ Current Memory Usage: 283.754 Meg
+
+Sun Sep  6 18:47:41 2026
+

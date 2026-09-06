@@ -1,0 +1,17 @@
+# Output products list for <Block_Lookup>
+Block_Lookup/blk_mem_gen_v7_3_readme.txt
+Block_Lookup/doc/blk_mem_gen_v7_3_vinfo.html
+Block_Lookup/doc/pg058-blk-mem-gen.pdf
+Block_Lookup.asy
+Block_Lookup.gise
+Block_Lookup.mif
+Block_Lookup.ngc
+Block_Lookup.sym
+Block_Lookup.vhd
+Block_Lookup.vho
+Block_Lookup.xco
+Block_Lookup.xise
+Block_Lookup_flist.txt
+Block_Lookup_xmdf.tcl
+_xmsgs/pn_parser.xmsgs
+summary.log

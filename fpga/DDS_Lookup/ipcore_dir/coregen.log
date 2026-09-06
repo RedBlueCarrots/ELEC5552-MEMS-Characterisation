@@ -1,0 +1,76 @@
+INFO:sim:172 - Generating IP...
+Applying current project options...
+Finished applying current project options.
+WARNING:sim - A core named 'Block_Lookup' already exists in the project. Output
+   products for this core may be overwritten.
+Resolving generics for 'Block_Lookup'...
+WARNING:sim - A core named 'Block_Lookup' already exists in the project. Output
+   products for this core may be overwritten.
+Applying external generics to 'Block_Lookup'...
+Delivering associated files for 'Block_Lookup'...
+Delivering EJava files for 'Block_Lookup'...
+Generating implementation netlist for 'Block_Lookup'...
+INFO:sim - Pre-processing HDL files for 'Block_Lookup'...
+Running synthesis for 'Block_Lookup'
+Running ngcbuild...
+Writing VHO instantiation template for 'Block_Lookup'...
+Writing VHDL behavioral simulation model for 'Block_Lookup'...
+WARNING:sim - Overwriting existing file
+   /home/redbluecarrots/Documents/University/ELEC5552/ELEC5552-MEMS-Characterisa
+   tion/fpga/DDS_Lookup/ipcore_dir/tmp/_cg/Block_Lookup/doc/blk_mem_gen_v7_3_vin
+   fo.html with file from view xilinx_documentation
+Delivered 1 file into directory
+/home/redbluecarrots/Documents/University/ELEC5552/ELEC5552-MEMS-Characterisatio
+n/fpga/DDS_Lookup/ipcore_dir/tmp/_cg/Block_Lookup
+Generating ASY schematic symbol...
+INFO:sim:949 - Finished generation of ASY schematic symbol.
+Generating SYM schematic symbol for 'Block_Lookup'...
+Generating metadata file...
+Regenerating ISE project file for 'Block_Lookup'...
+Generating ISE project...
+XCO file found: Block_Lookup.xco
+XMDF file found: Block_Lookup_xmdf.tcl
+Adding
+/home/redbluecarrots/Documents/University/ELEC5552/ELEC5552-MEMS-Characterisatio
+n/fpga/DDS_Lookup/ipcore_dir/tmp/_cg/Block_Lookup.asy -view all -origin_type
+imported
+Adding
+/home/redbluecarrots/Documents/University/ELEC5552/ELEC5552-MEMS-Characterisatio
+n/fpga/DDS_Lookup/ipcore_dir/tmp/_cg/Block_Lookup.ngc -view all -origin_type
+created
+Checking file
+"/home/redbluecarrots/Documents/University/ELEC5552/ELEC5552-MEMS-Characterisati
+on/fpga/DDS_Lookup/ipcore_dir/tmp/_cg/Block_Lookup.ngc" for project device match
+...
+File
+"/home/redbluecarrots/Documents/University/ELEC5552/ELEC5552-MEMS-Characterisati
+on/fpga/DDS_Lookup/ipcore_dir/tmp/_cg/Block_Lookup.ngc" device information
+matches project device.
+Adding
+/home/redbluecarrots/Documents/University/ELEC5552/ELEC5552-MEMS-Characterisatio
+n/fpga/DDS_Lookup/ipcore_dir/tmp/_cg/Block_Lookup.sym -view all -origin_type
+imported
+Adding
+/home/redbluecarrots/Documents/University/ELEC5552/ELEC5552-MEMS-Characterisatio
+n/fpga/DDS_Lookup/ipcore_dir/tmp/_cg/Block_Lookup.vhd -view all -origin_type
+created
+INFO:HDLCompiler:1061 - Parsing VHDL file
+   "/home/redbluecarrots/Documents/University/ELEC5552/ELEC5552-MEMS-Characteris
+   ation/fpga/DDS_Lookup/ipcore_dir/tmp/_cg/Block_Lookup.vhd" into library work
+INFO:ProjectMgmt - Parsing design hierarchy completed successfully.
+Adding
+/home/redbluecarrots/Documents/University/ELEC5552/ELEC5552-MEMS-Characterisatio
+n/fpga/DDS_Lookup/ipcore_dir/tmp/_cg/Block_Lookup.vho -view all -origin_type
+imported
+INFO:TclTasksC:2116 - The automatic calculation of top has been turned-off.
+   Please set the new top explicitly by running the "project set top" command.
+   To re-calculate the new top automatically, set the "Auto Implementation Top"
+   property to true.
+Top level has been set to "/Block_Lookup"
+Generating README file...
+Generating FLIST file...
+INFO:sim:948 - Finished FLIST file generation.
+Launching README viewer...
+Moving files to output directory...
+Finished moving files to output directory
+Wrote CGP file for project 'Block_Lookup'.

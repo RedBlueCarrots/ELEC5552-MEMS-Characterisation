@@ -1,0 +1,1 @@
+-intstyle "ise" -incremental -lib "secureip" -o "/home/redbluecarrots/Documents/University/ELEC5552/ELEC5552-MEMS-Characterisation/fpga/DDS_Lookup/BigLookUp_tb_isim_beh.exe" -prj "/home/redbluecarrots/Documents/University/ELEC5552/ELEC5552-MEMS-Characterisation/fpga/DDS_Lookup/BigLookUp_tb_beh.prj" "work.BigLookUp_tb" 

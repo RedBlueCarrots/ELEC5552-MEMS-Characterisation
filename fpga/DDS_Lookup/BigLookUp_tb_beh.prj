@@ -1,0 +1,3 @@
+vhdl work "ipcore_dir/Block_Lookup.vhd"
+vhdl work "BigLookUp.vhd"
+vhdl work "BigLookUp_tb.vhd"

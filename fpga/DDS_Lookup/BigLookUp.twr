@@ -1,0 +1,92 @@
+--------------------------------------------------------------------------------
+Release 14.7 Trace  (lin64)
+Copyright (c) 1995-2013 Xilinx, Inc.  All rights reserved.
+
+/opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64/unwrapped/trce -intstyle ise -v 3 -s 2 -n
+3 -fastpaths -xml BigLookUp.twx BigLookUp.ncd -o BigLookUp.twr BigLookUp.pcf
+
+Design file:              BigLookUp.ncd
+Physical constraint file: BigLookUp.pcf
+Device,package,speed:     xc6slx9,tqg144,C,-2 (PRODUCTION 1.23 2013-10-13)
+Report level:             verbose report
+
+Environment Variable      Effect 
+--------------------      ------ 
+NONE                      No environment variables were set
+--------------------------------------------------------------------------------
+
+INFO:Timing:2698 - No timing constraints found, doing default enumeration.
+INFO:Timing:3412 - To improve timing, see the Timing Closure User Guide (UG612).
+INFO:Timing:2752 - To get complete path coverage, use the unconstrained paths 
+   option. All paths that are not constrained will be reported in the 
+   unconstrained paths section(s) of the report.
+INFO:Timing:3339 - The clock-to-out numbers in this timing report are based on 
+   a 50 Ohm transmission line loading model.  For the details of this model, 
+   and for more information on accounting for different loading conditions, 
+   please see the device datasheet.
+
+
+
+Data Sheet report:
+-----------------
+All values displayed in nanoseconds (ns)
+
+Setup/Hold to clock m_clk
+------------+------------+------------+------------+------------+------------------+--------+
+            |Max Setup to|  Process   |Max Hold to |  Process   |                  | Clock  |
+Source      | clk (edge) |   Corner   | clk (edge) |   Corner   |Internal Clock(s) | Phase  |
+------------+------------+------------+------------+------------+------------------+--------+
+qual_sel<0> |    2.263(R)|      SLOW  |   -0.098(R)|      SLOW  |clk_out_OBUF_BUFG |   0.000|
+qual_sel<1> |    1.916(R)|      SLOW  |    0.231(R)|      SLOW  |clk_out_OBUF_BUFG |   0.000|
+wvfrm_sel<0>|    2.685(R)|      SLOW  |   -0.225(R)|      FAST  |clk_out_OBUF_BUFG |   0.000|
+wvfrm_sel<1>|    2.975(R)|      SLOW  |   -0.187(R)|      FAST  |clk_out_OBUF_BUFG |   0.000|
+------------+------------+------------+------------+------------+------------------+--------+
+
+Clock m_clk to Pad
+------------+-----------------+------------+-----------------+------------+------------------+--------+
+            |Max (slowest) clk|  Process   |Min (fastest) clk|  Process   |                  | Clock  |
+Destination |  (edge) to PAD  |   Corner   |  (edge) to PAD  |   Corner   |Internal Clock(s) | Phase  |
+------------+-----------------+------------+-----------------+------------+------------------+--------+
+dac_out<0>  |         9.268(R)|      SLOW  |         3.883(R)|      FAST  |clk_out_OBUF_BUFG |   0.000|
+dac_out<1>  |         9.335(R)|      SLOW  |         3.913(R)|      FAST  |clk_out_OBUF_BUFG |   0.000|
+dac_out<2>  |         9.148(R)|      SLOW  |         3.790(R)|      FAST  |clk_out_OBUF_BUFG |   0.000|
+dac_out<3>  |         9.172(R)|      SLOW  |         3.802(R)|      FAST  |clk_out_OBUF_BUFG |   0.000|
+dac_out<4>  |         9.141(R)|      SLOW  |         3.814(R)|      FAST  |clk_out_OBUF_BUFG |   0.000|
+dac_out<5>  |         9.160(R)|      SLOW  |         3.802(R)|      FAST  |clk_out_OBUF_BUFG |   0.000|
+dac_out<6>  |         9.107(R)|      SLOW  |         3.764(R)|      FAST  |clk_out_OBUF_BUFG |   0.000|
+dac_out<7>  |         9.139(R)|      SLOW  |         3.782(R)|      FAST  |clk_out_OBUF_BUFG |   0.000|
+dac_out<8>  |         9.091(R)|      SLOW  |         3.772(R)|      FAST  |clk_out_OBUF_BUFG |   0.000|
+dac_out<9>  |         8.904(R)|      SLOW  |         3.646(R)|      FAST  |clk_out_OBUF_BUFG |   0.000|
+dac_out<10> |         9.157(R)|      SLOW  |         3.823(R)|      FAST  |clk_out_OBUF_BUFG |   0.000|
+dac_out<11> |         9.228(R)|      SLOW  |         3.858(R)|      FAST  |clk_out_OBUF_BUFG |   0.000|
+dac_out<12> |         9.026(R)|      SLOW  |         3.672(R)|      FAST  |clk_out_OBUF_BUFG |   0.000|
+dac_out<13> |         8.841(R)|      SLOW  |         3.584(R)|      FAST  |clk_out_OBUF_BUFG |   0.000|
+------------+-----------------+------------+-----------------+------------+------------------+--------+
+
+Clock to Setup on destination clock m_clk
+---------------+---------+---------+---------+---------+
+               | Src:Rise| Src:Fall| Src:Rise| Src:Fall|
+Source Clock   |Dest:Rise|Dest:Rise|Dest:Fall|Dest:Fall|
+---------------+---------+---------+---------+---------+
+m_clk          |    3.379|         |         |         |
+---------------+---------+---------+---------+---------+
+
+Pad to Pad
+---------------+---------------+---------+
+Source Pad     |Destination Pad|  Delay  |
+---------------+---------------+---------+
+m_clk          |clk_out        |    7.169|
+---------------+---------------+---------+
+
+
+Analysis completed Sun Sep  6 16:22:33 2026 
+--------------------------------------------------------------------------------
+
+Trace Settings:
+-------------------------
+Trace Settings 
+
+Peak Memory Usage: 370 MB
+
+
+
