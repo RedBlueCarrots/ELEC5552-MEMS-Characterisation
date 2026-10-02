@@ -21,6 +21,34 @@
 
 bool hidden[30*10] = {false};
 
+//MENU STATES:
+#define HOME 0
+#define WFRM_SETTINGS 1
+#define WFRM_SHAPE 2
+#define WFRM_FQ 3
+#define WFRM_AMP 4
+#define WFRM_OFF 5
+#define WFRM_MOD 6
+#define SET_TEMP 7
+#define GRAPH_WFRM 8
+#define GRAPH_TEMP 9
+#define WFRM_MOD_FQ 10
+#define WFRM_MOD_DP 11
+
+const int HOME_LINKS[6] = {-1, 1, 7, 8, 9, -2};
+const int WFRM_SETTINGS_LINKS[6] = {-1, 2, 3, 4, 5, 6};
+const int WFRM_SHAPE_LINKS[6] = {-1, -1, -1, -1, -1, 1};
+const int WFRM_FQ_LINKS[6] = {-1, -2, -1, -1, -1, 1};
+const int WFRM_AMP_LINKS[6] = {-1, -2, -1, -1, -1, 1};
+const int WFRM_OFF_LINKS[6] = {-1, -2, -1, -1, -1, 1};
+const int WFRM_MOD_LINKS[6] = {-1, -2, -1, 10, 11, 1};
+const int SET_TEMP_LINKS[6] = {-1, -2, -1, -1, -1, 0};
+const int GRAPH_WFRM_LINKS[6] = {-1, -2, -2, -2, -2, -2};
+const int GRAPH_TEMP_LINKS[6] = {-1, -2, -2, -2, -2, -2};
+const int WFRM_MOD_FQ_LINKS[6] = {-1, -2, -1, -1, -1, 6};
+const int WFRM_MOD_DP_LINKS[6] = {-1, -2, -1, -1, -1, 6};
+const int* PAGE_LINKS[12] = {HOME_LINKS, WFRM_SETTINGS_LINKS,WFRM_SHAPE_LINKS,WFRM_FQ_LINKS,WFRM_AMP_LINKS,WFRM_OFF_LINKS,WFRM_MOD_LINKS,SET_TEMP_LINKS,GRAPH_WFRM_LINKS,GRAPH_TEMP_LINKS,WFRM_MOD_FQ_LINKS,WFRM_MOD_DP_LINKS};
+
 
 XPT2046_Touchscreen ts(XPT2046_CS, XPT2046_IRQ);
 
@@ -117,6 +145,10 @@ void send_rgb(byte R, byte G, byte B) {
   SPI.transfer(B);
   SPI.transfer(G);
   SPI.transfer(R);
+}
+
+void select_menu(int slot) {
+
 }
 
 void draw_frame() {
