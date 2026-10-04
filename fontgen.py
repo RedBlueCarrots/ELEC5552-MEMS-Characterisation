@@ -1,15 +1,18 @@
 from PIL import Image, ImageDraw, ImageFont
 
-width, height = 16, 32
+width, height = 24, 48
 # Create a 1-bit canvas (0 = background/off)
-font = ImageFont.truetype("DejaVuSansMono.ttf", size=24)
+font = ImageFont.truetype("DejaVuSansMono.ttf", size=36)
 f = open("font_lookup.h", "w")
 for i in range(128):
     img = Image.new("1", (width, height), 0)
     draw = ImageDraw.Draw(img)
 
     # Render character
-    draw.text((0, -2), chr(max(32, i)), fill=1, font=font)
+    i2 = i
+    if i == ord("~"):
+        i2 = ord("°")
+    draw.text((0, -2), chr(max(32, i2)), fill=1, font=font)
 
     # Convert pixels to 1D byte list (0x00 for ON, 0xFF for OFF)
     pixels = img.load()
