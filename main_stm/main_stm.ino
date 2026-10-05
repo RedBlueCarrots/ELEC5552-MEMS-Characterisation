@@ -1,6 +1,7 @@
 #include "font_lookup.h"
 
 #include <SPI.h>
+#include <Wire.h>
 #include <XPT2046_Touchscreen.h>
 
 // --- Pin Definitions ---
@@ -11,7 +12,7 @@
 #define TFT_BL   PB3
 // Define the Touch Chip Select pin
 #define XPT2046_IRQ 3   // Optional interrupt pin (TP_IRQ)
-#define XPT2046_CS  PA0  // Change to your actual TP_CS pin
+#define XPT2046_CS  PB6  // Change to your actual TP_CS pin
 
 // Default Hardware SPI1 Pins for STM32F4 (Blackpill):
 // SPI1 SCK  -> PA5
@@ -73,18 +74,62 @@ int menu = HOME;
 int highlight = 0;
 const bool IS_HIGHLIGHT[12] = {false, false, false, true, true, true, false, true, false, false, true, true};
 
+// 1. Define custom SPI instances based on your .ioc pins
+SPIClass ScreenSPI(PB5, PB4, PB3);  // MOSI, MISO, SCLK (PA15 is CS)
+SPIClass DDSSPI(PB15, PB14, PB13); // MOSI, MISO, SCLK (PB12 is CS)
+SPIClass TempSPI(PC12, PC11, PC10);
+
+// 2. Define custom I2C instances
+TwoWire FPGAI2C(PB9, PB8); // SDA, SCL
+TwoWire TempWire(PF0, PF1); // SDA, SCL
+
+#define DDSFSYNC PB12
+
+// Output Pin Array from your .ioc config
+const uint8_t outputPins[] = {
+  PA0, PA1, PA2, PA3, PB0, PB1, PB2, PB6,
+  PC0, PC1, PC2, PC3, PC9, PC10, PC11, PC12
+};
+
+void setup_pins() {
+  // Configure GPIO Outputs
+  for (uint8_t i = 0; i < sizeof(outputPins); i++) {
+    pinMode(outputPins[i], OUTPUT);
+  }
+
+  // SPI CS Pins
+  pinMode(PA15, OUTPUT);
+  digitalWrite(PA15, HIGH);
+  pinMode(PB12, OUTPUT);
+  digitalWrite(PB12, HIGH);
+
+  // Initialize Peripherals
+  ScreenSPI.begin();
+  DDSSPI.begin();
+  FPGAI2C.begin();
+  TempWire.begin();
+
+  // Analog Setup
+  analogReadResolution(12);  // STM32 ADC supports up to 12-bit
+  analogWriteResolution(12); // PA4 DAC Output
+  
+  // // EXTI Interrupt Setup (PA10)
+  // pinMode(PA10, INPUT_PULLUP);
+  // attachInterrupt(digitalPinToInterrupt(PA10), myInterruptHandler, RISING);
+}
+
 // Helper functions for sending Commands & Data via Hardware SPI
 void lcdCommand(uint8_t cmd) {
   digitalWrite(TFT_DC, LOW);
   digitalWrite(TFT_CS, LOW);
-  SPI.transfer(cmd);
+  ScreenSPI.transfer(cmd);
   digitalWrite(TFT_CS, HIGH);
 }
 
 void lcdData(uint8_t data) {
   digitalWrite(TFT_DC, HIGH);
   digitalWrite(TFT_CS, LOW);
-  SPI.transfer(data);
+  ScreenSPI.transfer(data);
   digitalWrite(TFT_CS, HIGH);
 }
 
@@ -108,9 +153,8 @@ void init_menu() {
 void setup() {
   init_menu();
   load_menu();
+  setup_pins();
   delay(1000);
-  Serial.begin(115200);
-  Serial.println("HI");
   // Initialize Control Pins
   pinMode(TFT_CS, OUTPUT);
   pinMode(TFT_DC, OUTPUT);
@@ -120,12 +164,10 @@ void setup() {
   digitalWrite(TFT_CS, HIGH);
   digitalWrite(TFT_BL, HIGH); // Turn backlight on
 
-  // Start Hardware SPI
-  SPI.begin();
   ts.begin();
   ts.setRotation(3); // Match your display rotation
   // Set SPI settings (18MHz clock speed, MSB First, SPI Mode 0)
-  SPI.beginTransaction(SPISettings(60000000, MSBFIRST, SPI_MODE0));
+  ScreenSPI.beginTransaction(SPISettings(60000000, MSBFIRST, SPI_MODE0));
 
   // 1. Hardware Reset
   digitalWrite(TFT_RST, HIGH); delay(20);
@@ -179,13 +221,12 @@ void setup() {
   SPI.endTransaction();
 
   draw_frame();
-  Serial.println("DONE");
 }
 
 void send_rgb(byte R, byte G, byte B) {
-  SPI.transfer(B);
-  SPI.transfer(G);
-  SPI.transfer(R);
+  ScreenSPI.transfer(B);
+  ScreenSPI.transfer(G);
+  ScreenSPI.transfer(R);
 }
 
 void change_menu(int slot, int x) {
@@ -359,7 +400,7 @@ void load_menu() {
 
 void draw_frame() {
   lcdCommand(0x2C); // RAMWR
-  SPI.beginTransaction(SPISettings(60000000, MSBFIRST, SPI_MODE0));
+  ScreenSPI.beginTransaction(SPISettings(60000000, MSBFIRST, SPI_MODE0));
   digitalWrite(TFT_DC, HIGH);
   digitalWrite(TFT_CS, LOW);
     for (uint32_t i = 0; i < (320UL * 480UL); i++) {
@@ -371,7 +412,6 @@ void draw_frame() {
       int yy = y % 48;
       char *line = current_menu[spot_y];
       byte out = font[line[spot_x]][yy*24+xx];
-
       if (IS_HIGHLIGHT[menu]) {
         if (highlight ==HIGHLIGHT_EXP[menu]) {
           spot_x -= 1;
@@ -389,7 +429,7 @@ void draw_frame() {
 
     }
   digitalWrite(TFT_CS, HIGH);
-  SPI.endTransaction();
+  ScreenSPI.endTransaction();
 }
 
 void loop() {
@@ -397,17 +437,12 @@ void loop() {
    TS_Point p = ts.getPoint();
     int x = 4+(p.x-280)/15 * 2;
     int y = 320 - (p.y-175)/23*2;
-    Serial.print(", X = ");
-    Serial.print(x);
-    Serial.print(", Y = ");
-    Serial.println(y);
 
     int spot_x = x/24;
     int spot_y = y/48;
     change_menu(spot_y, spot_x);
     load_menu();
     draw_frame();
-    Serial.println("TOUCHED");
     delay(10);
     
   }
