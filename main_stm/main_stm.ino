@@ -1,4 +1,6 @@
 #include "font_lookup.h"
+#include "si5351.h"
+#include "AD9834.h"
 
 #include <SPI.h>
 #include <Wire.h>
@@ -18,7 +20,6 @@
 // SPI1 SCK  -> PA5
 // SPI1 MISO -> PA6 (Not connected to LCD)
 // SPI1 MOSI -> PA7
-
 
 //MENU STATES:
 #define HOME 0
@@ -53,7 +54,21 @@ const int* PAGE_LINKS[12] = {HOME_LINKS, WFRM_SETTINGS_LINKS,WFRM_SHAPE_LINKS,WF
 #define TRIANGLE 2
 #define SAWTOOTH 3
 
-uint32_t shape = SINE;
+struct WaveState {
+  int wshape;
+  int wamplitude;
+  int wfreq; 
+  int woffset; 
+  int wtemp; 
+  int wmod_freq; 
+  int wmod_depth;
+  int wtime;
+};
+
+struct WaveState USBStates[101] = {0};
+int USBStateCount = 0;
+
+int shape = SINE;
 int amplitude = 125; // Divide by 10
 int freq = 134000; //Divide by 10
 int offset = 25; //Divide by 10
@@ -68,7 +83,7 @@ int HIGHLIGHT_EXP[12] = {0, 0, 0, 8, 2, 2, 0, 2, 0, 0, 4, 3};
 
 XPT2046_Touchscreen ts(XPT2046_CS);//, XPT2046_IRQ);
 
-char* current_menu[10];
+char* current_menu[11];
 int menu = HOME;
 
 int highlight = 0;
@@ -76,26 +91,75 @@ const bool IS_HIGHLIGHT[12] = {false, false, false, true, true, true, false, tru
 
 // 1. Define custom SPI instances based on your .ioc pins
 SPIClass ScreenSPI(PB5, PB4, PB3);  // MOSI, MISO, SCLK (PA15 is CS)
-SPIClass DDSSPI(PB15, PB14, PB13); // MOSI, MISO, SCLK (PB12 is CS)
+AD9834 DDS(72000000);
+//SPIClass DDSSPI(PB15, PB14, PB13); // MOSI, MISO, SCLK (PB12 is CS)
 SPIClass TempSPI(PC12, PC11, PC10);
 
 // 2. Define custom I2C instances
-TwoWire FPGAI2C(PB9, PB8); // SDA, SCL
 TwoWire TempWire(PF0, PF1); // SDA, SCL
 
 #define DDSFSYNC PB12
 
+Si5351 si5351;
+
+HardwareTimer *MyTim;
+HardwareTimer *ModTim;
+uint32_t channel;
 // Output Pin Array from your .ioc config
 const uint8_t outputPins[] = {
   PA0, PA1, PA2, PA3, PB0, PB1, PB2, PB6,
   PC0, PC1, PC2, PC3, PC9, PC10, PC11, PC12
 };
+#define QSEL0 PC0
+#define QSEL1 PC1
+#define WSEL0 PC2
+#define WSEL1 PC3
+
+#define SIGSEL PA3
+#define DDSSEL PA2
+#define DDSCLKSEL PA1
+
+#define PWM_PERIOD_TICKS 250
+
+volatile int timerCount = 0;
+volatile bool isAMHigh = true;
+
+int USBWordSize = 0;
+char USBWord[10];
+bool isUSBProgram = false;
+int next_time = 0;
+
+void do_USB_Program() {
+  isUSBProgram = true;
+  shape = USBStates[USBStateCount].wshape;
+  amplitude = USBStates[USBStateCount].wamplitude;
+  freq = USBStates[USBStateCount].wfreq;
+  offset = USBStates[USBStateCount].woffset;
+  temp = USBStates[USBStateCount].wtemp;
+  mod_freq = USBStates[USBStateCount].wmod_freq;
+  mod_depth = USBStates[USBStateCount].wmod_depth;
+  next_time = USBStates[USBStateCount].wtime + millis();
+  if (USBStates[USBStateCount].wtime == 0) {
+    isUSBProgram = false;
+  }
+}
+
+//AMPLITUDE MODULATION
+void Mod_Timer_Callback() {
+  timerCount += 1;
+  if (timerCount % 5 == 0) {
+    isAMHigh = !isAMHigh;
+    set_amplitudes();
+  }
+}
+
 
 void setup_pins() {
   // Configure GPIO Outputs
   for (uint8_t i = 0; i < sizeof(outputPins); i++) {
     pinMode(outputPins[i], OUTPUT);
   }
+  digitalWrite(DDSCLKSEL, HIGH);
 
   // SPI CS Pins
   pinMode(PA15, OUTPUT);
@@ -105,17 +169,141 @@ void setup_pins() {
 
   // Initialize Peripherals
   ScreenSPI.begin();
-  DDSSPI.begin();
-  FPGAI2C.begin();
   TempWire.begin();
 
   // Analog Setup
   analogReadResolution(12);  // STM32 ADC supports up to 12-bit
   analogWriteResolution(12); // PA4 DAC Output
+
+  TIM_TypeDef *Instance = (TIM_TypeDef *)pinmap_peripheral(digitalPinToPinName(PA5), PinMap_PWM);
+  channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(PA5), PinMap_PWM));
+
+  // 2. Dynamically allocate the HardwareTimer object
+  MyTim = new HardwareTimer(Instance);
+  // 1. Pause the timer while configuring parameters
+  MyTim->pause();
+  MyTim->setPrescaleFactor(1);
+  MyTim->setOverflow(PWM_PERIOD_TICKS, TICK_FORMAT);
+  MyTim->setMode(1, TIMER_OUTPUT_COMPARE_PWM1, PA5);
+  MyTim->resume();
+
+  ModTim = new HardwareTimer(TIM6);
+  ModTim->pause();
+  ModTim->setOverflow(10000, HERTZ_FORMAT);
+  ModTim->attachInterrupt(Mod_Timer_Callback);
+  ModTim->refresh();
+  ModTim->resume();
+
+  // 3. Configure and start the hardware PWM
+  // Parameters: (channel, pin, frequency_in_Hz, duty_cycle_percent)
+  //MyTimer->setPWM(channel, PA5, 20000, 50);
   
   // // EXTI Interrupt Setup (PA10)
   // pinMode(PA10, INPUT_PULLUP);
   // attachInterrupt(digitalPinToInterrupt(PA10), myInterruptHandler, RISING);
+
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  GPIO_InitStruct.Pin = GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  GPIO_InitStruct.Alternate = GPIO_AF0_MCO;  // AF0 maps MCO to PA8
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_RCC_MCOConfig(RCC_MCO1, RCC_MCO1SOURCE_SYSCLK, RCC_MCODIV_1);
+}
+
+void select_shape() {
+  if (shape == SINE) {
+    digitalWrite(WSEL0, LOW);
+    digitalWrite(WSEL1, LOW);
+    digitalWrite(DDSSEL, LOW);
+  } else if (shape == SQUARE) {
+    digitalWrite(WSEL0, HIGH);
+    digitalWrite(WSEL1, LOW);
+    digitalWrite(DDSSEL, HIGH);
+  } else if (shape == TRIANGLE) {
+    digitalWrite(WSEL0, LOW);
+    digitalWrite(WSEL1, HIGH);
+    digitalWrite(DDSSEL, LOW);
+  } else {
+    digitalWrite(WSEL0, HIGH);
+    digitalWrite(WSEL1, HIGH);
+  }
+
+
+}
+
+void set_amplitudes() {
+  int temp_amp = amplitude;
+  if (isAMHigh) {
+    temp_amp += int(((float(mod_depth)/1000)*amplitude));
+  } else {
+    temp_amp += int(((float(mod_depth)/1000)*amplitude));
+  }
+  analogWrite(PA4, 8*temp_amp);
+  MyTim->setCaptureCompare(1, offset, TICK_COMPARE_FORMAT);
+  
+}
+
+void select_generator() {
+  if (freq > 1000000 || shape == SAWTOOTH) {
+    digitalWrite(SIGSEL, HIGH);
+  } else {
+    digitalWrite(SIGSEL, LOW);
+  }
+}
+
+void update_serials() {
+  //FPGA
+  int qual = 80;
+  if (freq > 100000000) {
+    qual = 10;
+    digitalWrite(QSEL0, LOW);
+    digitalWrite(QSEL1, LOW);
+  } else if (freq > 5000000) {
+    qual = 20;
+    digitalWrite(QSEL0, HIGH);
+    digitalWrite(QSEL1, LOW);
+  } else if (freq > 2500000) {
+    qual = 40;
+    digitalWrite(QSEL0, LOW);
+    digitalWrite(QSEL1, HIGH);
+  } else {
+    digitalWrite(QSEL0, HIGH);
+    digitalWrite(QSEL1, HIGH);
+  }
+  si5351.set_freq(((unsigned long long)freq)*10*qual, SI5351_CLK0);
+  si5351.update_status();
+
+
+  DDS.update_freq(float(freq)/10.0);
+  analogWrite(PA5, 127);
+}
+
+void i2c_setup() {
+  bool i2c_found;
+
+  // Start serial and initialize the Si5351
+  i2c_found = si5351.init(SI5351_CRYSTAL_LOAD_8PF, 0, 0);
+  if(!i2c_found)
+  {
+    for (int i = 0; i < 1000; i++) {
+      Serial.println("FPGA CLOCK not found on I2C bus!");
+      delay(1000);
+    }
+  }
+
+
+}
+
+void change_mod_freq() {
+  ModTim = new HardwareTimer(TIM6);
+  ModTim->pause();
+  ModTim->setOverflow(mod_freq, HERTZ_FORMAT);
+  ModTim->attachInterrupt(Mod_Timer_Callback);
+  ModTim->refresh();
+  ModTim->resume();
 }
 
 // Helper functions for sending Commands & Data via Hardware SPI
@@ -382,6 +570,7 @@ void load_menu() {
       strncpy(current_menu[3] , "    <-        ->    ", 31);
       strncpy(current_menu[4] , "    +          -    ", 31);
       strncpy(current_menu[5] , "Back", 31);
+      change_mod_freq();
       break;
     case WFRM_MOD_DP:
       strncpy(current_menu[1] , "AM Depth", 31);
@@ -432,6 +621,63 @@ void draw_frame() {
   ScreenSPI.endTransaction();
 }
 
+void check_for_serial() {
+  if (Serial.available() > 0) {
+
+    // Read the incoming byte
+    char incomingByte = Serial.read();
+    
+    if (incomingByte >= '0' && incomingByte <= '9') {
+      //number
+      USBWordSize += 1;
+    } else {
+      USBWordSize = 0;
+    }
+    USBWord[USBWordSize] = incomingByte;
+    if (USBWordSize == 9) {
+      char type = USBWord[0];
+      USBWord[10] = '\n';
+      int num = atoi(USBWord+1);
+      switch (type) {
+        case 'S':
+          USBStateCount = -1;
+          break;
+        case 'W':
+          USBStates[USBStateCount].wshape = num;
+          break;
+        case 'F':
+          USBStates[USBStateCount].wfreq = num;
+          break;
+        case 'A':
+          USBStates[USBStateCount].wamplitude = num;
+          break;
+        case 'O':
+          USBStates[USBStateCount].woffset = num;
+          break;
+        case 'K':
+          USBStates[USBStateCount].wtemp = num;
+          break;
+        case 'M':
+          USBStates[USBStateCount].wmod_freq = num;
+          break;
+        case 'D':
+          USBStates[USBStateCount].wmod_depth = num;
+          break;
+        case 'T':
+          USBStates[USBStateCount].wtime = num;
+          break;
+        case 'N':
+          USBStateCount += 1;
+          break;
+        case 'E':
+          USBStateCount = 0;
+          do_USB_Program();
+      }
+
+    }
+  }
+}
+
 void loop() {
   if (ts.touched()) {
    TS_Point p = ts.getPoint();
@@ -442,9 +688,13 @@ void loop() {
     int spot_y = y/48;
     change_menu(spot_y, spot_x);
     load_menu();
+    select_shape();
+    update_serials();
     draw_frame();
     delay(10);
     
   }
-  delay(10);
+  if (isUSBProgram && next_time < millis()) {
+    do_USB_Program();
+  }
 }
