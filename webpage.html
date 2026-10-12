@@ -1,79 +1,224 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Web Serial Device Controller</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurable Web Serial Generator</title>
+    <style>
+        body { font-family: sans-serif; max-width: 950px; margin: 30px auto; padding: 20px; line-height: 1.5; }
+        .section { background: #f9f9f9; padding: 15px; border: 1px solid #ddd; margin-bottom: 20px; border-radius: 6px; }
+        h2 { margin-top: 0; font-size: 1.2rem; }
+        label { display: inline-block; margin-right: 10px; font-weight: bold; font-size: 0.9rem; }
+        input, select, button { padding: 6px 10px; font-size: 14px; margin: 4px 0; }
+        button { background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .step-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr auto; gap: 8px; align-items: center; background: #fff; padding: 10px; border: 1px solid #ccc; margin-bottom: 8px; border-radius: 4px; }
+        .step-row label { display: block; font-size: 0.75rem; color: #555; margin-bottom: 2px; }
+        .step-row input, .step-row select { width: 100%; box-sizing: border-box; }
+        #log { background: #1e1e1e; color: #d4d4d4; padding: 10px; border: 1px solid #333; height: 180px; overflow-y: scroll; font-family: monospace; font-size: 13px; white-space: pre-wrap; border-radius: 4px; }
+        .danger { background-color: #dc3545; }
+        .danger:hover { background-color: #c82333; }
+    </style>
 </head>
-<div class="control-group">
-    <label for="baudRate">Baud Rate:</label>
-    <select id="baudRate">
-        <option value="9600">9600</option>
-        <option value="19200">19200</option>
-        <option value="38400">38400</option>
-        <option value="57600">57600</option>
-        <option value="115200" selected>115200</option>
-    </select>
-    <button id="connectBtn">Connect Serial Port</button>
-</div>
+<body>
+    <h1>Configurable Web Serial Generator</h1>
 
-<div class="control-group">
-    <button id="sendBtn" disabled>Send "S000000000"</button>
-</div>
+    <div class="section">
+        <h2>1. Connection</h2>
+        <div>
+            <label for="baudRate">Baud Rate:</label>
+            <select id="baudRate">
+                <option value="9600">9600</option>
+                <option value="19200">19200</option>
+                <option value="38400">38400</option>
+                <option value="57600">57600</option>
+                <option value="115200" selected>115200</option>
+            </select>
+            <button id="connectBtn">Connect Serial Port</button>
+        </div>
+    </div>
 
-<div class="control-group">
-    <label>Console Log:</label>
-    <div id="log"></div>
-</div>
+    <div class="section">
+        <h2>2. Configure Sequence (Up to 100 Steps)</h2>
+        <div id="stepsContainer"></div>
+        <button id="addStepBtn">+ Add Step</button>
+    </div>
 
-<script>
-    let port;
+    <div class="section">
+        <h2>3. Transmission</h2>
+        <button id="sendBtn" disabled>Send Full Sequence</button>
+    </div>
 
-    const connectBtn = document.getElementById('connectBtn');
-    const sendBtn = document.getElementById('sendBtn');
-    const baudRateSelect = document.getElementById('baudRate');
-    const logDiv = document.getElementById('log');
+    <div class="section">
+        <h2>Console Log</h2>
+        <div id="log"></div>
+    </div>
 
-    function log(message) {
-        logDiv.textContent += message + '\n';
-        logDiv.scrollTop = logDiv.scrollHeight;
-    }
+    <script>
+        let port;
+        const connectBtn = document.getElementById('connectBtn');
+        const sendBtn = document.getElementById('sendBtn');
+        const baudRateSelect = document.getElementById('baudRate');
+        const stepsContainer = document.getElementById('stepsContainer');
+        const addStepBtn = document.getElementById('addStepBtn');
+        const logDiv = document.getElementById('log');
 
-    connectBtn.addEventListener('click', async () => {
-        if (!('serial' in navigator)) {
-            alert('Web Serial API not supported in this browser. Use Chrome, Edge, or Opera.');
-            return;
+        function log(message) {
+            logDiv.textContent += message + '\n';
+            logDiv.scrollTop = logDiv.scrollHeight;
         }
 
-        try {
-            port = await navigator.serial.requestPort();
-            const baudRate = parseInt(baudRateSelect.value, 10);
-            await port.open({ baudRate: baudRate });
-            
-            log(`Connected to serial port at ${baudRate} baud.`);
-            connectBtn.textContent = 'Connected';
-            connectBtn.disabled = true;
-            baudRateSelect.disabled = true;
-            sendBtn.disabled = false;
-        } catch (error) {
-            log(`Error: ${error.message}`);
+        function addStep(data = {}) {
+            if (stepsContainer.children.length >= 100) {
+                alert('Maximum of 100 steps reached.');
+                return;
+            }
+            const row = document.createElement('div');
+            row.className = 'step-row';
+            row.innerHTML = `
+                <div>
+                    <label>Waveform</label>
+                    <select class="wave">
+                        <option value="0" ${data.wave == 0 ? 'selected' : ''}>0: Sine</option>
+                        <option value="1" ${data.wave == 1 ? 'selected' : ''}>1: Square</option>
+                        <option value="2" ${data.wave == 2 ? 'selected' : ''}>2: Triangle</option>
+                        <option value="3" ${data.wave == 3 ? 'selected' : ''}>3: Sawtooth</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Freq (Hz, max 20M)</label>
+                    <input type="number" class="freq" min="0" max="20000000" step="0.1" value="${data.freq !== undefined ? data.freq : 1000}">
+                </div>
+                <div>
+                    <label>Offset (V, max 25)</label>
+                    <input type="number" class="offset" min="-25" max="25" step="0.1" value="${data.offset !== undefined ? data.offset : 0}">
+                </div>
+                <div>
+                    <label>Amp (V, max 50)</label>
+                    <input type="number" class="amp" min="0" max="50" step="0.1" value="${data.amp !== undefined ? data.amp : 5.0}">
+                </div>
+                <div>
+                    <label>Temp (°C, 5-60)</label>
+                    <input type="number" class="temp" min="5" max="60" step="0.1" value="${data.temp !== undefined ? data.temp : 25.0}">
+                </div>
+                <div>
+                    <label>Wait (s)</label>
+                    <input type="number" class="time" min="0" max="999999.999" step="0.001" value="${data.time !== undefined ? data.time : 1.0}">
+                </div>
+                <div>
+                    <label>&nbsp;</label>
+                    <button type="button" class="danger removeBtn">X</button>
+                </div>
+            `;
+            row.querySelector('.removeBtn').addEventListener('click', () => {
+                row.remove();
+            });
+            stepsContainer.appendChild(row);
         }
-    });
 
-    sendBtn.addEventListener('click', async () => {
-        if (!port) return;
+        // Initialize with one default step
+        addStep();
 
-        try {
-            const textEncoder = new TextEncoderStream();
-            const writableStreamClosed = textEncoder.readable.pipeTo(port.writable);
-            const writer = textEncoder.writable.getWriter();
-            
-            await writer.write("S000000000W000000020F000012340A000000304O000000005K000000345M000000100D000000040T000010000N000000000W000000020F000043210A000000204O000000015K000000145M000000200D000000400T000002000N000000000E000000000");
-            log('Sent: S000000000W000000020F000012340A000000304O000000005K000000345M000000100D000000040T000010000N000000000W000000020F000043210A000000204O000000015K000000145M000000200D000000400T000002000N000000000E000000000');
-            
-            writer.releaseLink();
-        } catch (error) {
-            log(`Send error: ${error.message}`);
+        addStepBtn.addEventListener('click', () => addStep());
+
+        connectBtn.addEventListener('click', async () => {
+            if (!('serial' in navigator)) {
+                alert('Web Serial API not supported in this browser. Use Chrome, Edge, or Opera.');
+                return;
+            }
+            try {
+                port = await navigator.serial.requestPort();
+                const baudRate = parseInt(baudRateSelect.value, 10);
+                await port.open({ baudRate: baudRate });
+                log(`Connected to serial port at ${baudRate} baud.`);
+                connectBtn.textContent = 'Connected';
+                connectBtn.disabled = true;
+                baudRateSelect.disabled = true;
+                sendBtn.disabled = false;
+            } catch (error) {
+                log(`Connection Error: ${error.message}`);
+            }
+        });
+
+        function formatWave(x) {
+            return 'W0000000' + x + '0';
         }
-    });
-</script>
+
+        function formatFreq(val) {
+            const clamped = Math.max(0, Math.min(20000000.0, val));
+            const intPart = Math.floor(clamped);
+            const fracPart = Math.round((clamped - intPart) * 10);
+            return 'F' + intPart.toString().padStart(8, '0') + fracPart.toString().slice(-1);
+        }
+
+        function formatXXY(prefix, val, minVal, maxVal) {
+            const clamped = Math.max(minVal, Math.min(maxVal, val));
+            const intPart = Math.floor(clamped);
+            const fracPart = Math.round((clamped - intPart) * 10);
+            return prefix + '000000' + intPart.toString().padStart(2, '0') + fracPart.toString().slice(-1);
+        }
+
+        function formatTime(val) {
+            const clamped = Math.max(0, Math.min(999999.999, val));
+            const intPart = Math.floor(clamped);
+            const fracPart = Math.round((clamped - intPart) * 1000);
+            return 'T' + intPart.toString().padStart(6, '0') + fracPart.toString().padStart(3, '0').slice(-3);
+        }
+
+        sendBtn.addEventListener('click', async () => {
+            if (!port) return;
+
+            const stepRows = stepsContainer.querySelectorAll('.step-row');
+            if (stepRows.length === 0) {
+                alert('Please add at least one step.');
+                return;
+            }
+
+            try {
+                const textEncoder = new TextEncoderStream();
+                const writableStreamClosed = textEncoder.readable.pipeTo(port.writable);
+                const writer = textEncoder.writable.getWriter();
+
+                async function sendLine(msg) {
+                    const fullMsg = msg + '\n';
+                    await writer.write(fullMsg);
+                    log('Sent: ' + msg);
+                }
+
+                // 1. Send start command
+                await sendLine('S000000000');
+
+                // 2. Loop through steps (up to 100 times)
+                for (let i = 0; i < stepRows.length; i++) {
+                    const row = stepRows[i];
+                    const wave = row.querySelector('.wave').value;
+                    const freq = parseFloat(row.querySelector('.freq').value) || 0;
+                    const offset = parseFloat(row.querySelector('.offset').value) || 0;
+                    const amp = parseFloat(row.querySelector('.amp').value) || 0;
+                    const temp = parseFloat(row.querySelector('.temp').value) || 25;
+                    const time = parseFloat(row.querySelector('.time').value) || 0;
+
+                    await sendLine(formatWave(wave));
+                    await sendLine(formatFreq(freq));
+                    await sendLine(formatXXY('O', offset, -25, 25));
+                    await sendLine(formatXXY('A', amp, 0, 50));
+                    await sendLine(formatXXY('K', temp, 5, 60));
+                    await sendLine(formatTime(time));
+
+                    // End of group
+                    await sendLine('N000000000');
+                }
+
+                // 3. End message
+                await sendLine('E000000000');
+
+                writer.releaseLink();
+                log('Sequence transmission complete.');
+            } catch (error) {
+                log(`Send error: ${error.message}`);
+            }
+        });
+    </script>
 </body>
-</html>                                                   
+</html>
