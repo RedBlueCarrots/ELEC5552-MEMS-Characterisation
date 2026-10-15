@@ -6,6 +6,33 @@
 #include <Wire.h>
 #include <XPT2046_Touchscreen.h>
 
+#include <Adafruit_MAX31865.h>
+
+
+//max31865 pins
+#define MAX_CS_PIN    PC9  
+#define MAX_MOSI_PIN  PC12  
+#define MAX_MISO_PIN  PC11  
+#define MAX_CLK_PIN   PC10  
+
+// reference resistor for PT100
+#define RREF      430.0
+// nominal resistance for PT100
+#define RNOMINAL  100.0
+Adafruit_MAX31865 thermo = Adafruit_MAX31865(MAX_CS_PIN, MAX_MOSI_PIN, MAX_MISO_PIN, MAX_CLK_PIN);
+int dutyPercent = 0; // initialise duty at 0%
+float targetTemp = 25.0;
+
+double Kp = 6;
+double Ki = 1;
+double Kd = 0;
+double integralTerm = 0;
+double lastError = 0;
+unsigned long lastControlTime = 0;
+
+#define TempPWM1 PC6
+#define TempPWM2 PC7
+
 // --- Pin Definitions ---
 // TFT Control Pins
 #define TFT_CS   PB0
@@ -75,6 +102,7 @@ int offset = 25; //Divide by 10
 int temp = 441; //Divide by 10
 int mod_freq = 250; //Divide by 10
 int mod_depth = 500; //Divide by 10
+float currentTemp;
 
 int *VAR_LOOKUP[12] = {0, 0, 0, &freq, &amplitude, &offset, 0, &temp, 0, 0, &mod_freq, &mod_depth};
 int VAR_MAXES[12] = {0, 0, 0, 200000000, 500, 250, 0, 600, 0, 0, 10000, 1000};
@@ -104,6 +132,7 @@ Si5351 si5351;
 
 HardwareTimer *MyTim;
 HardwareTimer *ModTim;
+HardwareTimer *TempTim;
 uint32_t channel;
 // Output Pin Array from your .ioc config
 const uint8_t outputPins[] = {
@@ -153,6 +182,48 @@ void Mod_Timer_Callback() {
   }
 }
 
+void applyDuty(float percent) {
+  dutyPercent = round(percent);
+  if (dutyPercent < 0) {
+    analogWrite(TempPWM1, -1*dutyPercent);
+    analogWrite(TempPWM2, 0);
+  } else {
+    analogWrite(TempPWM1, 0);
+    analogWrite(TempPWM2, dutyPercent);
+  }
+}
+
+void updateTemperatureControl() {
+  unsigned long now = millis();
+
+  float dt = (now - lastControlTime) / 1000.0;
+  lastControlTime = now;
+
+  float error;
+  error = temp - currentTemp;
+
+  integralTerm += error * dt;
+  integralTerm = constrain(integralTerm, -50.0, 50.0); // anti-windup clamp
+
+  float derivative = (dt > 0) ? (error - lastError) / dt : 0;
+  lastError = error;
+
+  float output = Kp * error + Ki * integralTerm + Kd * derivative;
+  output = constrain(output, -100.0, 100.0);
+  applyDuty(output);
+}
+
+void Temp_Timer_Callback() {
+  float temperature_C  = thermo.temperature(RNOMINAL, RREF);
+  currentTemp = temperature_C;
+  uint8_t fault = thermo.readFault();
+  if (fault) {
+    thermo.clearFault(); // clear so it doesn't latch; still reported below
+  }
+
+  updateTemperatureControl();
+}
+
 
 void setup_pins() {
   // Configure GPIO Outputs
@@ -160,6 +231,7 @@ void setup_pins() {
     pinMode(outputPins[i], OUTPUT);
   }
   digitalWrite(DDSCLKSEL, HIGH);
+  thermo.begin(MAX31865_3WIRE);
 
   // SPI CS Pins
   pinMode(PA15, OUTPUT);
@@ -193,6 +265,14 @@ void setup_pins() {
   ModTim->attachInterrupt(Mod_Timer_Callback);
   ModTim->refresh();
   ModTim->resume();
+
+  TempTim = new HardwareTimer(TIM16);
+  TempTim->pause();
+  TempTim->setOverflow(5, HERTZ_FORMAT);
+  TempTim->attachInterrupt(Temp_Timer_Callback);
+  TempTim->refresh();
+  TempTim->resume();
+
 
   // 3. Configure and start the hardware PWM
   // Parameters: (channel, pin, frequency_in_Hz, duty_cycle_percent)
@@ -348,6 +428,8 @@ void setup() {
   pinMode(TFT_DC, OUTPUT);
   pinMode(TFT_RST, OUTPUT);
   pinMode(TFT_BL, OUTPUT);
+  pinMode(TempPWM1, OUTPUT);
+  pinMode(TempPWM2, OUTPUT);
 
   digitalWrite(TFT_CS, HIGH);
   digitalWrite(TFT_BL, HIGH); // Turn backlight on
@@ -492,6 +574,7 @@ void decrement_highlight() {
 void load_menu() {
   clear_menu();
   strncpy(current_menu[0] , "BACK            HOME", 31);
+  int ctemp = round(currentTemp*10);
   switch (menu) {
     case HOME:
     strncpy(current_menu[1], "Change Waveform", 31);
@@ -544,7 +627,7 @@ void load_menu() {
       strncpy(current_menu[5] , "Back", 31);
       break;
     case SET_TEMP:
-      sprintf(current_menu[1], "Current: %d.%d~", temp/10, temp%10);
+      sprintf(current_menu[1], "Current: %d.%d~", ctemp/10, ctemp%10);
       sprintf(current_menu[2] , "%02d.%01d Target   ", temp/10, temp%10);
       strncpy(current_menu[3] , "    <-        ->    ", 31);
       strncpy(current_menu[4] , "    +          -    ", 31);
@@ -691,7 +774,6 @@ void loop() {
     select_shape();
     update_serials();
     draw_frame();
-    delay(10);
     
   }
   if (isUSBProgram && next_time < millis()) {

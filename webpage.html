@@ -3,20 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configurable Web Serial Generator</title>
+    <title>Configurable Web Serial Generator with Editor</title>
     <style>
         body { font-family: sans-serif; max-width: 950px; margin: 30px auto; padding: 20px; line-height: 1.5; }
         .section { background: #f9f9f9; padding: 15px; border: 1px solid #ddd; margin-bottom: 20px; border-radius: 6px; }
         h2 { margin-top: 0; font-size: 1.2rem; }
         label { display: inline-block; margin-right: 10px; font-weight: bold; font-size: 0.9rem; }
-        input, select, button { padding: 6px 10px; font-size: 14px; margin: 4px 0; }
+        input, select, button, textarea { padding: 6px 10px; font-size: 14px; margin: 4px 0; box-sizing: border-box; }
         button { background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
         button:hover { background-color: #0056b3; }
         button:disabled { background-color: #ccc; cursor: not-allowed; }
         .step-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr auto; gap: 8px; align-items: center; background: #fff; padding: 10px; border: 1px solid #ccc; margin-bottom: 8px; border-radius: 4px; }
         .step-row label { display: block; font-size: 0.75rem; color: #555; margin-bottom: 2px; }
-        .step-row input, .step-row select { width: 100%; box-sizing: border-box; }
-        #log { background: #1e1e1e; color: #d4d4d4; padding: 10px; border: 1px solid #333; height: 180px; overflow-y: scroll; font-family: monospace; font-size: 13px; white-space: pre-wrap; border-radius: 4px; }
+        .step-row input, .step-row select { width: 100%; }
+        textarea { width: 100%; height: 180px; font-family: monospace; font-size: 13px; }
+        #log { background: #1e1e1e; color: #d4d4d4; padding: 10px; border: 1px solid #333; height: 150px; overflow-y: scroll; font-family: monospace; font-size: 13px; white-space: pre-wrap; border-radius: 4px; }
         .danger { background-color: #dc3545; }
         .danger:hover { background-color: #c82333; }
     </style>
@@ -43,11 +44,17 @@
         <h2>2. Configure Sequence (Up to 100 Steps)</h2>
         <div id="stepsContainer"></div>
         <button id="addStepBtn">+ Add Step</button>
+        <button id="generateBtn" style="background-color: #28a745; margin-left: 10px;">Generate Serial Output from Table</button>
     </div>
 
     <div class="section">
-        <h2>3. Transmission</h2>
-        <button id="sendBtn" disabled>Send Full Sequence</button>
+        <h2>3. Serial Output Editor (Editable Text)</h2>
+        <textarea id="serialOutputText" placeholder="Click 'Generate Serial Output from Table' or type/edit your raw serial commands here..."></textarea>
+    </div>
+
+    <div class="section">
+        <h2>4. Transmission</h2>
+        <button id="sendBtn" disabled>Send Serial Output</button>
     </div>
 
     <div class="section">
@@ -59,9 +66,11 @@
         let port;
         const connectBtn = document.getElementById('connectBtn');
         const sendBtn = document.getElementById('sendBtn');
+        const generateBtn = document.getElementById('generateBtn');
         const baudRateSelect = document.getElementById('baudRate');
         const stepsContainer = document.getElementById('stepsContainer');
         const addStepBtn = document.getElementById('addStepBtn');
+        const serialOutputText = document.getElementById('serialOutputText');
         const logDiv = document.getElementById('log');
 
         function log(message) {
@@ -117,9 +126,7 @@
             stepsContainer.appendChild(row);
         }
 
-        // Initialize with one default step
         addStep();
-
         addStepBtn.addEventListener('click', () => addStep());
 
         connectBtn.addEventListener('click', async () => {
@@ -166,52 +173,61 @@
             return 'T' + intPart.toString().padStart(6, '0') + fracPart.toString().padStart(3, '0').slice(-3);
         }
 
-        sendBtn.addEventListener('click', async () => {
-            if (!port) return;
-
+        generateBtn.addEventListener('click', () => {
             const stepRows = stepsContainer.querySelectorAll('.step-row');
             if (stepRows.length === 0) {
                 alert('Please add at least one step.');
                 return;
             }
 
+            const lines = [];
+            lines.push('S000000000');
+
+            for (let i = 0; i < stepRows.length; i++) {
+                const row = stepRows[i];
+                const wave = row.querySelector('.wave').value;
+                const freq = parseFloat(row.querySelector('.freq').value) || 0;
+                const offset = parseFloat(row.querySelector('.offset').value) || 0;
+                const amp = parseFloat(row.querySelector('.amp').value) || 0;
+                const temp = parseFloat(row.querySelector('.temp').value) || 25;
+                const time = parseFloat(row.querySelector('.time').value) || 0;
+
+                lines.push(formatWave(wave));
+                lines.push(formatFreq(freq));
+                lines.push(formatXXY('O', offset, -25, 25));
+                lines.push(formatXXY('A', amp, 0, 50));
+                lines.push(formatXXY('K', temp, 5, 60));
+                lines.push(formatTime(time));
+                lines.push('N000000000');
+            }
+
+            lines.push('E000000000');
+            serialOutputText.value = lines.join('\n');
+            log('Serial output generated from table.');
+        });
+
+        sendBtn.addEventListener('click', async () => {
+            if (!port) return;
+
+            const textContent = serialOutputText.value.trim();
+            if (!textContent) {
+                alert('Serial output text is empty. Generate or type commands first.');
+                return;
+            }
+
+            const lines = textContent.split(/\r?\n/);
+
             try {
                 const textEncoder = new TextEncoderStream();
                 const writableStreamClosed = textEncoder.readable.pipeTo(port.writable);
                 const writer = textEncoder.writable.getWriter();
 
-                async function sendLine(msg) {
-                    const fullMsg = msg + '\n';
-                    await writer.write(fullMsg);
-                    log('Sent: ' + msg);
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (line === '') continue;
+                    await writer.write(line + '\n');
+                    log('Sent: ' + line);
                 }
-
-                // 1. Send start command
-                await sendLine('S000000000');
-
-                // 2. Loop through steps (up to 100 times)
-                for (let i = 0; i < stepRows.length; i++) {
-                    const row = stepRows[i];
-                    const wave = row.querySelector('.wave').value;
-                    const freq = parseFloat(row.querySelector('.freq').value) || 0;
-                    const offset = parseFloat(row.querySelector('.offset').value) || 0;
-                    const amp = parseFloat(row.querySelector('.amp').value) || 0;
-                    const temp = parseFloat(row.querySelector('.temp').value) || 25;
-                    const time = parseFloat(row.querySelector('.time').value) || 0;
-
-                    await sendLine(formatWave(wave));
-                    await sendLine(formatFreq(freq));
-                    await sendLine(formatXXY('O', offset, -25, 25));
-                    await sendLine(formatXXY('A', amp, 0, 50));
-                    await sendLine(formatXXY('K', temp, 5, 60));
-                    await sendLine(formatTime(time));
-
-                    // End of group
-                    await sendLine('N000000000');
-                }
-
-                // 3. End message
-                await sendLine('E000000000');
 
                 writer.releaseLink();
                 log('Sequence transmission complete.');
