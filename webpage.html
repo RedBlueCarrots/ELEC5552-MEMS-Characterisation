@@ -218,18 +218,17 @@
             const lines = textContent.split(/\r?\n/);
 
             try {
-                const textEncoder = new TextEncoderStream();
-                const writableStreamClosed = textEncoder.readable.pipeTo(port.writable);
-                const writer = textEncoder.writable.getWriter();
+                const writer = port.writable.getWriter();
+                const encoder = new TextEncoder();
 
                 for (let i = 0; i < lines.length; i++) {
                     const line = lines[i].trim();
                     if (line === '') continue;
-                    await writer.write(line + '\n');
+                    await writer.write(encoder.encode(line + '\n'));
                     log('Sent: ' + line);
                 }
 
-                writer.releaseLink();
+                writer.releaseLock();
                 log('Sequence transmission complete.');
             } catch (error) {
                 log(`Send error: ${error.message}`);

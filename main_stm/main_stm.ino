@@ -154,7 +154,7 @@ volatile int timerCount = 0;
 volatile bool isAMHigh = true;
 
 int USBWordSize = 0;
-char USBWord[10];
+char USBWord[11];
 bool isUSBProgram = false;
 int next_time = 0;
 
@@ -226,6 +226,7 @@ void Temp_Timer_Callback() {
 
 
 void setup_pins() {
+  Serial.begin(115200);
   // Configure GPIO Outputs
   for (uint8_t i = 0; i < sizeof(outputPins); i++) {
     pinMode(outputPins[i], OUTPUT);
@@ -705,7 +706,10 @@ void draw_frame() {
 }
 
 void check_for_serial() {
-  if (Serial.available() > 0) {
+  if (!Serial) {
+    
+  }
+  else if (Serial.available() > 0) {
 
     // Read the incoming byte
     char incomingByte = Serial.read();
@@ -719,11 +723,11 @@ void check_for_serial() {
     USBWord[USBWordSize] = incomingByte;
     if (USBWordSize == 9) {
       char type = USBWord[0];
-      USBWord[10] = '\n';
+      USBWord[10] = '\0';
       int num = atoi(USBWord+1);
       switch (type) {
         case 'S':
-          USBStateCount = -1;
+          USBStateCount = 0;
           break;
         case 'W':
           USBStates[USBStateCount].wshape = num;
@@ -776,6 +780,7 @@ void loop() {
     draw_frame();
     
   }
+  check_for_serial();
   if (isUSBProgram && next_time < millis()) {
     do_USB_Program();
   }
